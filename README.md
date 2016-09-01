@@ -1,3 +1,3 @@
-# Optimizing heavy web services
+# Scala on Android
 
-Presentation I gave at Oliwa Business Center, Gdańsk on 01.28.2016.
+Presentation I gave at Silver Tower Center, Wrocław on 09.03.2016.

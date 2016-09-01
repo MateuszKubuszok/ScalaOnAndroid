@@ -4,9 +4,9 @@
   <head>
     <meta charset="utf-8">
 
-    <title>Optimizing Heavy Web Service</title>
+    <title>Scala on Android</title>
 
-    <meta name="description" content="Solutions my team applied to several performance issues in our project" />
+    <meta name="description" content="Current state of art in using Scala for Android applications developement" />
     <meta name="author" content="Mateusz Kubuszok" />
 
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -38,490 +38,156 @@
 
       <div class="slides">
         <section>
-          <h1>Optimizing Heavy Web Service</h1>
+          <h1>Scala on Android</h1>
           <h3><a href="http://kubuszok.pl">Mateusz Kubuszok</a> <b>&gt;</b> <a href="https://scalac.io">Scalac</a></h3>
         </section>
 
         <section>
           <h2>Agenda</h2>
           <ul>
-            <li class="fragment">when optimize</li>
-            <li class="fragment">optimizing queries</li>
-            <li class="fragment">caching requests</li>
-            <li class="fragment">keeping things simple</li>
-          </ul>
-        </section>
-
-        <section>
-          <cite>
-            Programmers waste enormous amounts of time thinking about, or worrying about, the speed of noncritical parts of their programs, and these attempts at efficiency actually have a strong negative impact when debugging and maintenance are considered. We should forget about small efficiencies, say about 97% of the time: <b>premature optimization is the root of all evil</b>. Yet <b>we should not pass up our opportunities in that critical 3%</b>.
-          </cite>
-
-          <p align="right">-- Donald Knuth</p>
-        </section>
-
-        <section>
-          <h2>How can we tell if optimization is needed and where?</h2>
-
-          <h1 class="fragment">Measure!</h1>
-        </section>
-
-        <section>
-          <section>
-            <pre><code class="hljs scala">
-  trait Service[Request, Response] {
-
-    def apply(request: Request): Future[Response]
-  }
-
-  object Service {
-
-    def apply[Request, Response](body: Request => Future[Response]) =
-      new Service[Request, Response] {
-
-        override def apply(request: Request) = body(request)
-      }
-  }
-            </code></pre>
-          </section>
-
-          <section>
-            <pre><code class="hljs scala">
-def monitored[Request, Response](name: String)
-                                (service: Service[Request, Response]) =
-  new Service[Request, Response] {
-
-    override def apply(request: Request) = {
-      NewRelic.incrementCounter(name)
-      val start = System.currentTimeMillis
-      val response = service(request)
-      response onComplete { case _ =>
-        val time = System.currentTimeMillis - start
-        NewRelic.recordResponseTimeMetric(name, time)
-      }
-      response onError { case ex => NewRelic.noticeError(ex) }
-      response
-    }
-  }
-            </code></pre>
-          </section>
-
-          <section>
-            <pre><code class="hljs scala">
-val getUsersBillings: Service[UsersBillingsReq, UsersBillingsRes] =
-  monitored("UserServices.getUserBillings") {
-    Service { request =>
-      Future {
-        val formattedBillings = for {
-          user     <- userRepository.fetchUsers(request.userIds)
-          contract <- user.contracts
-          billings <- contract.billings
-        } yield formatBilling(user, contract, billing)
-
-        UsersBillingsRes(formattedBillings)
-      }
-    }
-  }
-            </code></pre>
-          </section>
-        </section>
-
-        <section>
-          <h2>Queries to the database</h2>
-
-          <ul>
-            <li class="fragment">n+1 query problem</li>
-            <li class="fragment">recalculating things all over again</li>
-          </ul>
-        </section>
-
-        <section>
-          <h3>n+1 query</h3>
-
-          <ul>
-            <li class="fragment">often consequence of using the Active Record pattern</li>
-            <li class="fragment">usually not that much of an issue when the amount of requests is low, operations are simple and DB latency is low (e.g. small blogs, very simple CRUDs)</li>
-            <li class="fragment">kills performance when service is heavily used, requires data from a long chain of relations and latency is non-negligible</li>
+            <li class="fragment">raw Scala and Android</li>
+            <li class="fragment">different flavours of UI developement</li>
+            <li class="fragment">functional programming on Android</li>
           </ul>
         </section>
 
         <section>
           <section>
-            <pre><code class="hljs scala">
-// avg. user has 3 contacts
-// avg. contract has 2 billings
-
-val formattedBillings = for {
-  user     <- userRepository.fetchUsers(request.userIds)
-              // 1 DB query
-  contract <- user.contracts
-              // next 3 DB queries on avg.
-  billing  <- contracts.billings
-              // next 3*2=6 DB queries on avg.
-} yield formatBilling(user, contract, billing)
-        // total 10 queries on avg.
-            </code></pre>
+            <h1>Scala and Android</h1>
           </section>
 
           <section>
-            <pre><code class="hljs scala">
-// avg. user has 3 contacts
-// avg. contract has 2 billings
-
-val users     = userRepository.fetchUsers(request.userIds)
-                  .map(user => (user.id, user)).toMap
-val contracts = contractRepository.findForUserIds(users.keys)
-                  .map(contract => (contract.id, contract)).toMap
-val billings  = billingRepository.findByContractIds(contracts.keys)
-                // 3 queries in total
-
-val formattedBillings = for {
-  billing  <- billings
-  contract <- contract.get(billing.contractId).toSeq
-  user     <- users.get(contract.userId).toSeq
-} yield formatBilling(user, contract, billing)
-            </code></pre>
-          </section>
-        </section>
-
-        <section>
-          <h3>Caching DB requests</h3>
-        </section>
-
-        <section>
-          <section>
-            <h4>Result we'd like to cache</h4>
-            <pre><code class="hljs scala">
-Future {
-  val users     = userRepository.fetchUsers(request.userIds)
-                    .map(user => (user.id, user)).toMap
-  val contracts = contractRepository.findForUserIds(users.keys)
-                    .map(contract => (contract.id, contract)).toMap
-  val billings  = billingRepository.findByContractIds(contracts.keys)
-
-  val formattedBillings = for {
-    billing  <- billings
-    contract <- contract.get(billing.contractId).toSeq
-    user     <- users.get(contract.userId).toSeq
-  } yield formatBilling(user, contract, billing)
-
-  UsersBillingsRes(formattedBillings)
-}
-            </code></pre>
+            <h2>Gotchas</h2>
+            <ul>
+              <li class="fragment">Android -> kind of Java 7 -> Scala 2.11.8</li>
+              <li class="fragment">proguard and/or multidex</li>
+              <li class="fragment"></li>
+            </ul>
           </section>
 
           <section>
-            <h4>How could be acheive that with Redis?</h4>
-            <pre><code class="hljs json">
-{
-  "EntityKey(user, 1)" : {
-    "user-billings-1,2,5": "",
-    ...
-  },
-  "EntityKey(user, 2)" : {
-    "user-billings-1,2,5": "",
-    ...
-  },
-  ...
-  "user-billings-1,2,5": [serialized value],
-  ...
-}
-            </code></pre>
+            <h2>Gradle - less invasive approach</h2>
           </section>
 
           <section>
-            <pre><code class="hljs scala">
-case class EntityKey(type: String, id: String)
+            <h2>gradle-android-scala-plugin</h2>
 
-trait CacheContext[T] {
+            <section>
+              <pre><code class="hljs gradle">
 
-  def entityKeys(value: T): Seq[EntityKey] // entities result depends on
-  def serializer: Serializer[T]            // T -> String
-  def deserializer: Deserializer[T]        // String -> T
-}
-            </code></pre>
-          </section>
+              </code></pre>
+            </section>
 
-          <section>
-            <pre><code class="hljs scala">
-trait CacheHandler {
-  def getOrPut[T](valueKey: String, ttl: Duration)
-                 (valueF => Future[T]))
-                 (implicit cacheContext: CacheContext[T],
-                           executionContext: ExecutionContext): Future[T]
-  def invalidate(entityKeys: EntityKey*)
-}
-            </code></pre>
-          </section>
-
-          <section>
-            <h4>Obtaining values from Redis</h4>
-            <pre><code class="hljs scala">
-def get[T](key: String)
-          (implicit cacheContext: CacheContext[T],
-                    executionContext: ExecutionContext): Future[T] =
-  redisClient.mget(key) map { gets =>
-    gets.headOption map (_.toArray) map cacheContext.deserializer
-  }
-            </code></pre>
-          </section>
-
-          <section>
-            <h4>Storing values into Redis</h4>
-            <pre><code class="hljs scala">
-def put[T](valueKey: String, value: T, ttl: Duration)
-          (implicit cacheContext: CacheContext[T],
-                    executionContext: ExecutionContext): Future[Unit] = {
-  val entityKeys = cacheContext.entityKeys(value)
-  val bytes = cacheContext.serializer(value).bytes
-  val transaction = redisClient.multi()
-  transaction.setex(valueKey, ttl.toSeconds, bytes)
-  entityKeys map (_.toString) map { entityKey =>
-    transaction.hmset(entityKey, Map(valueKey -> Array[Bytes]()))
-    transaction.expire(entityKey, maxTtl.toSeconds)
-  }
-  transaction.exec() map (())
-}
-            </code></pre>
-          </section>
-
-          <section>
-            <pre><code class="hljs scala">
-def getOrPut[T](valueKey: String, ttl: Duration)
-               (valueF: => Future[T]))
-               (implicit cacheContext: CacheContext[T],
-                         executionContext: ExecutionContext): Future[T] =
-  get[T](valueKey) flatMap { optionValue =>
-    optionValue map Future.successful getOrElse {
-      for {
-        value <- valueF
-        _     <- put[T](valueKey, value, ttl)
-      } yield value
-    }
-  }
-            </code></pre>
-          </section>
-
-          <section>
-            <h4>Invalidating values</h4>
-            <pre><code class="hljs scala">
-val transaction = redisClient.multi()
-val keys = entityKeys map (_.toString) map { key =>
-  key -> transaction.hgetall(key) }
-for {
-  _ <- transaction.exec()
-  invTransaction = redisClient.multi()
-  allInvalidatedKeys <- Future.sequence(keys map { case (key, keyMapF) =>
-    keyMapF map { keyMap =>
-      val invKeys = keyMap.keys
-      invTransaction.hdel(key, invKeys:_*)
-      invKeys
-    }
-  }) map (_.flatten)
-  _ = invTransaction.del(allInvalidatedKeys:_*)
-  _ <- invTransaction.exec()
-} yield ()
-            </code></pre>
-          </section>
-
-          <section>
-            <pre><code class="hljs scala">
-implicit val userBillingsContext = new CacheContext[UsersBillingsRes] {
-
-  def entityKeys(value: UsersBillingsRes): Seq[EntityKey] = ...
-  def serializer: Serializer[UsersBillingsRes]            = ...
-  def deserializer: Deserializer[UsersBillingsRes]        = ...
-}
-            </code></pre>
-
-            <pre><code class="hljs scala">
-cacheHandler.getOrPut[UsersBillingsRes](
-    s"user-billings-${request.userIds.mkString}", 10 minutes) {
-  Future {
-    // ...
-
-    UsersBillingsRes(formattedBillings)
-  }
-}
-            </code></pre>
-          </section>
-
-        </section>
-
-        <section>
-          <section>
-            <h3>Caching API requests</h3>
-          </section>
-
-          <section>
-            <pre><code class="hljs scala">
-trait UsersControllerImpl extends UsersController {
-
-  def getBillingsForCurrentUserAndContractor(userId: Long) =
-      authenticatedRequest { request =>
-    val observedEntityId   = userId
-    val observedEntityType = "user"
-    val currentUserId = currentUser.id
-
-    for {
-      result <- userServices.getContractBillingsForPair(
-          ContractBillingsForPairReuqest(userId, currentUserId))
-    } yield {
-      // create JSON from user
-    }
-  }
-}
-            </code></pre>
-          </section>
-
-          <section>
-            <h4>Lets improve CacheHandler a little</h4>
-            <pre><code class="hljs scala">
-def getOrPut[T](valueKey: String, ttl: Duration, request: Request)
-               (valueF => Future[T]))
-               (implicit cacheContext: RequestCacheContext[T],
-                         executionContext: ExecutionContext): Future[T] = {
-  val uri    = request.uri
-  val header = request.headers.get(Headers.Authentication)
-                              .getOrElse("")
-  val params = request.params.map { case (name, value) =>
-    name + ":" + value.sorted.toString
-  }.toSeq.sorted
-  val requestSuffix = s"$uri-$header-${params.mkString}"
-
-  getOrPut[T](s"$value-$requestSuffix", ttl)(valueF)
-}
-            </code></pre>
-          </section>
-
-          <section>
-            <pre><code class="hljs scala">
-def getBillingsForCurrentUserAndContractor(userId: Long) =
-    authenticatedRequest { request =>
-  val observedEntityId = userId
-  val currentUserId    = currentUser.id
-
-  cacheHandler.getOrPut[BillingJsonResult](
-      "api-billings-for-$userId", 10 minutes, request) {
-    for {
-      result <- userServices.getContractBillingsForPair(
-          ContractBillingsForPairReuqest(userId, currentUserId))
-    } yield {
-      // create JSON from user
-    }
-  }
-}
-            </code></pre>
-          </section>
-
-        </section>
-
-        <section>
-          <section>
-            <h2>Removal of redundant queries</h2>
-          </section>
-
-          <section>
-             <pre><code class="hljs scala">
-val users     = userRepository.fetchUsers(request.userIds)
-                  .map(user => (user.id, user)).toMap
-val contracts = contractRepository.findForUserIds(users.keys)
-                  .map(contract => (contract.id, contract)).toMap
-val billings  = billingRepository.findByContractIds(contracts.keys)
-
-val formattedBillings = for {
-  billing  <- billings
-  contract <- contract.get(billing.contractId).toSeq
-  user     <- users.get(contract.userId).toSeq
-} yield formatBilling(user, contract, billing)
-
-UsersBillingsRes(formattedBillings)
-            </code></pre>
-          </section>
-
-          <section>
-             <pre><code class="hljs json">
-[
-  {
-    "id": 5543,
-    "date": "2015-10-23",
-    ...
-    "_links": ...,
-    "_embedded": {
-      "user": {
-        "id": 1,
-        "name": "John",
-        "surname": "Smith",
-        ...
-      },
-      "contract": {
-        "id": 646,
-        ...
-      },
-      "billings": {
-        "id": 766,
-        ...
-      }
-    }
-  },
-  ...
-]
-            </code></pre>
-          </section>
-
-          <section>
-            <h3>Was it all really needed?</h3>
-
-            <p class="fragment">No!</p>
-            <p class="fragment">We actually needed:
+            <section>
               <ul>
-                <li class="fragment">Billing</li>
-                <li class="fragment">User ID</li>
-                <li class="fragment">Contract ID</li>
+                <li class="fragment">existed since 2013</li>
+                <li class="fragment">supports Scala 2.10.5 and 2.11.7</li>
+                <li class="fragment">requires manual config of multidex and/or proguard</li>
+                <li class="fragment">last update 5 months ago</li>
               </ul>
-            </p>
+            </section>
           </section>
 
           <section>
-             <pre><code class="hljs scala">
-// UserId -> Billings
-val billingsByUsers: Map[Long, Seq[Billing]] =
-    billingRepository.findByUserIds(request.userIds)
+            <h2>gradle-android-scala-plugin</h2>
 
-val formattedBillings = for {
-  (userId, billings) <- billingsByUsers
-  billing            <- billings
-  contractId        = billing.contractId
-} yield formatBilling(userId, contractId, billing)
+            <section>
+              <pre><code class="hljs gradle">
 
-UsersBillingsResponse(formattedBillings)
-            </code></pre>
+              </code></pre>
+            </section>
+
+            <section>
+              <ul>
+                <li class="fragment">existed since 2013</li>
+                <li class="fragment">supports Scala 2.10.5 and 2.11.7</li>
+                <li class="fragment">requires manual config of multidex and/or proguard</li>
+                <li class="fragment">last update 5 months ago</li>
+              </ul>
+            </section>
           </section>
 
           <section>
-             <pre><code class="hljs json">
-[
-  {
-    "id": 5543,
-    "date": "2015-10-23",
-    "userId": 1,
-    "contractId": 646,
-    ...
-  },
-  ...
-]
-            </code></pre>
+            <h2>Gradle</h2>
+            <ul>
+              <li class="fragment">IntelliJ support - WYSIWYG</li>
+              <li class="fragment">all normal tutorials and docs could be easily applied</li>
+              <li class="fragment">cannot freely choose Scala version</li>
+              <li class="fragment">no support for macros</li>
+            </ul>
           </section>
 
+          <section>
+            <h2>SBT - complete Scala experience</h2>
+          </section>
+
+          <section>
+            <h2>sbt-android</h2>
+
+            <section>
+              <pre><code class="hljs scala">
+
+              </code></pre>
+            </section>
+
+            <section>
+              <ul>
+                <li class="fragment">existed since 2013</li>
+                <li class="fragment">supports Scala 2.10.5 and 2.11.7</li>
+                <li class="fragment">requires manual config of multidex and/or proguard</li>
+                <li class="fragment">last update 5 months ago</li>
+              </ul>
+            </section>
+          </section>
+        </section>
+
+        <section>
+          <section>
+            <h1>Different flavours of UI developement</h1>
+          </section>
+
+          <section>
+            <h2>Old good XML</h2>
+          </section>
+
+          <section>
+            <h2>Scaloid</h2>
+          </section>
+
+          <section>
+            <h2>Macroid</h2>
+          </section>
+        </section>
+
+        <section>
+          <section>
+            <h1>Functional programming on Android</h1>
+          </section>
+
+          <section>
+            <h2>Android SDK</h2>
+          </section>
+
+          <section>
+            <h2>Mutability and statefulness</h2>
+          </section>
+
+          <section>
+            <h2>Slick</h2>
+          </section>
+
+          <section>
+            <h2>Scalaz and Cats</h2>
+          </section>
         </section>
 
         <section>
           <h2>Summary</h2>
           <ul>
-            <li class="fragment">measure what needs to be optimized</li>
-            <li class="fragment">avoid n+1 queries</li>
-            <li class="fragment">cache queries and API requests when necessary</li>
-            <li class="fragment">keep things simple and small</li>
+            <li class="fragment">Scala is an option</li>
+            <li class="fragment">UI can be developed in several ways</li>
+            <li class="fragment">our favourite libraries works</li>
+            <li class="fragment">Android SDK sucks</li>
           </ul>
         </section>
 
