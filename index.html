@@ -37,6 +37,7 @@
     <div class="reveal">
 
       <div class="slides">
+
         <section>
           <h1>Scala on Android</h1>
           <h3><a href="http://kubuszok.pl">Mateusz Kubuszok</a> <b>&gt;</b> <a href="https://scalac.io">Scalac</a></h3>
@@ -59,9 +60,9 @@
           <section>
             <h2>Gotchas</h2>
             <ul>
-              <li class="fragment">Android -> kind of Java 7 -> Scala 2.11.8</li>
-              <li class="fragment">proguard and/or multidex</li>
-              <li class="fragment"></li>
+              <li class="fragment">Android -> kind of Java 7 -> Scala 2.11.8 max</li>
+              <li class="fragment">virtually requires proguard and/or multidex</li>
+              <li class="fragment"><a href="https://sourceforge.net/p/proguard/bugs/549/">proguard 5.1 doesn't "like" Scala versions prior to 2.11.5</a></li>
             </ul>
           </section>
 
@@ -70,50 +71,41 @@
           </section>
 
           <section>
-            <h2>gradle-android-scala-plugin</h2>
-
-            <section>
-              <pre><code class="hljs gradle">
-
-              </code></pre>
-            </section>
-
-            <section>
-              <ul>
-                <li class="fragment">existed since 2013</li>
-                <li class="fragment">supports Scala 2.10.5 and 2.11.7</li>
-                <li class="fragment">requires manual config of multidex and/or proguard</li>
-                <li class="fragment">last update 5 months ago</li>
-              </ul>
-            </section>
-          </section>
-
-          <section>
-            <h2>gradle-android-scala-plugin</h2>
-
-            <section>
-              <pre><code class="hljs gradle">
-
-              </code></pre>
-            </section>
-
-            <section>
-              <ul>
-                <li class="fragment">existed since 2013</li>
-                <li class="fragment">supports Scala 2.10.5 and 2.11.7</li>
-                <li class="fragment">requires manual config of multidex and/or proguard</li>
-                <li class="fragment">last update 5 months ago</li>
-              </ul>
-            </section>
-          </section>
-
-          <section>
             <h2>Gradle</h2>
             <ul>
-              <li class="fragment">IntelliJ support - WYSIWYG</li>
+              <li class="fragment">IntelliJ support for WYSIWYG</li>
               <li class="fragment">all normal tutorials and docs could be easily applied</li>
-              <li class="fragment">cannot freely choose Scala version</li>
-              <li class="fragment">no support for macros</li>
+              <li class="fragment">no Scala formatters, coverage etc</li>
+            </ul>
+          </section>
+
+          <section>
+            <h3>gradle-android-scala-plugin</h3>
+          </section>
+
+          <section>
+            <code class="fragment">build.gradle</code>
+            <pre class="fragment"><code class="hljs gradle">buildscript {
+  dependencies {
+      classpath "com.android.tools.build:gradle:1.3.1"
+      classpath "jp.leafytree.gradle:gradle-android-scala-plugin:1.4"
+  }
+}</code></pre>
+            <pre class="fragment"><code class="hljs gradle">apply plugin: "com.android.application"
+apply plugin: "jp.leafytree.android-scala"</code></pre>
+            <pre class="fragment"><code class="hljs gradle">dependencies {
+  compile "org.scala-lang:scala-library:2.11.7"
+}</code></pre>
+          </section>
+
+          <section>
+            <h3>gradle-android-scala-plugin</h3>
+            <ul>
+              <li class="fragment">existed since 2014</li>
+              <li class="fragment">supports Scala 2.10.5 and 2.11.7</li>
+              <li class="fragment">no support for Scala compiler plugins</li>
+              <li class="fragment">requires manual config of multidex and/or proguard</li>
+              <li class="fragment">last update 5 months ago</li>
             </ul>
           </section>
 
@@ -123,21 +115,34 @@
 
           <section>
             <h2>sbt-android</h2>
+          </section>
 
-            <section>
-              <pre><code class="hljs scala">
+          <section>
+            <code class="fragment">project/plugins.sbt</code>
+            <pre class="fragment"><code class="hljs scala">addSbtPlugin("org.scala-android" % "sbt-android" % "1.6.15")</code></pre>
+            <code class="fragment">build.sbt</code>
+            <pre class="fragment"><code class="hljs scala">androidBuild
+            platformTarget := "android-21"</code></pre>
+          </section>
 
-              </code></pre>
-            </section>
+          <section>
+            <h2>sbt-android</h2>
+            <ul>
+              <li class="fragment">existed since 2012</li>
+              <li class="fragment">supports Scala 2.10.5 and 2.11.7</li>
+              <li class="fragment">requires manual config of multidex and/or proguard</li>
+              <li class="fragment">last update 5 months ago</li>
+            </ul>
+          </section>
 
-            <section>
-              <ul>
-                <li class="fragment">existed since 2013</li>
-                <li class="fragment">supports Scala 2.10.5 and 2.11.7</li>
-                <li class="fragment">requires manual config of multidex and/or proguard</li>
-                <li class="fragment">last update 5 months ago</li>
-              </ul>
-            </section>
+          <section>
+            <h2>sbt-android-gradle</h2>
+            <ul>
+              <li class="fragment">imports all settings from Gradle project into SBT</li>
+              <li class="fragment">we could maintaining project in Gradle and then reflect changes to SBT</li>
+              <li class="fragment">we can migrate Gradle to SBT and then remove Gradle build</li>
+              <li class="fragment">changes made manually would not be maintained so we would have to reapply</li>
+            </ul>
           </section>
         </section>
 
@@ -147,15 +152,101 @@
           </section>
 
           <section>
-            <h2>Old good XML</h2>
+            <h2>Ol' good XML/Java</h2>
+            <pre class="fragment"><code class="hljs xml">&lt;LinearLayout xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;
+    android:orientation=&quot;vertical&quot; android:layout_width=&quot;match_parent&quot;
+    android:layout_height=&quot;wrap_content&quot; android:padding=&quot;20dip&quot;&gt;
+  &lt;TextView android:layout_width=&quot;match_parent&quot; android:text=&quot;ID&quot;
+      android:id=&quot;@+id/userid&quot; android:layout_height=&quot;wrap_content&quot; /&gt;
+  &lt;EditText android:layout_width=&quot;match_parent&quot;
+      android:layout_height=&quot;wrap_content&quot; android:id=&quot;@+id/userId&quot; /&gt;
+  &lt;Button android:layout_width=&quot;match_parent&quot;
+      android:layout_height=&quot;wrap_content&quot; android:id=&quot;@+id/signin&quot;
+      android:text=&quot;Sign in&quot;/&gt;
+&lt;/LinearLayout&gt;</code></pre>
+            <small class="fragment">example from Scaloid docs</small>
+          </section>
+
+          <section>
+            <h2>Ol' good XML/Java</h2>
+            <pre class="fragment"><code class="hljs java">EditText userId = (EditText)findByViewId(R.id.userid);
+Button signin = (Button)findByViewId(R.id.signin);
+signin.setOnClickListener(new View.OnClickListener() {
+  public void onClick(View v) {
+    signin(userId.getText());
+  }
+});</code></pre>
+            <small class="fragment">example from Scaloid docs</small>
+          </section>
+
+          <section>
+            <h2>Ol' good XML/Java</h2>
+            <ul>
+              <li class="fragment">all tools support them</li>
+              <li class="fragment">documentation is using them, so no need to translating concepts into sth else</li>
+              <li class="fragment">verbose</li>
+            </ul>
           </section>
 
           <section>
             <h2>Scaloid</h2>
+            <pre class="fragment"><code class="hljs scala">new SVerticalLayout {
+    STextView("ID")
+    val userId = SEditText()
+    SButton("Sign in", signin(userId.text))
+  }.padding(20 dip)</code></pre>
+            <small class="fragment">example from Scaloid docs</small>
+          </section>
+
+          <section>
+            <h2>Scaloid</h2>
+            <ul>
+              <li class="fragment">less verbosity</li>
+              <li class="fragment">uses Scala features to create DSL</li>
+              <li class="fragment">has online converted from XML to Scaloid (for supported features)</li>
+              <li class="fragment">wraps everything in new classes/traits - it is hard to mix Scaloid with Java code</li>
+              <li class="fragment">some methods run on an UI thread</li>
+              <li class="fragment">no support for some newer SDK features (e.g. <code>android.support.v4.widget.DrawerLayout</code>)</li>
+              <li class="fragment">last update 2 months ago</li>
+            </ul>
           </section>
 
           <section>
             <h2>Macroid</h2>
+            <pre class="fragment"><code class="hljs scala">var userId = slot[EditText]
+
+l[VerticalLinearLayout](
+  w[TextView] <~ text("ID"),
+  w[EditText] <~ wire(userId),
+  w[Button] <~ text("Sign in") <~ On.click(signin(userId.get.getText))
+) ~> padding(all = 20 dp)</code></pre>
+            <small class="fragment">example from Macroid docs</small>
+          </section>
+
+          <section>
+            <h2>Macroid</h2>
+            <ul>
+              <li class="fragment">maintained by 47deg</li>
+              <li class="fragment">as little verbosity as with Scaloid</li>
+              <li class="fragment">works with all Android components</li>
+              <li class="fragment">really nice support for async - UI actions as IO monad (unfortunatelly they don't work with for-comprehension)</li>
+              <li class="fragment">thread safety (as opposed to vanilla Android SDK)</li>
+              <li class="fragment">last update 3 months ago</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2>Macroid</h2>
+            <pre class="fragment"><code class="hljs scala">val action: Ui[Button] =
+  (startButton <~ disable) ~
+  (stopButton <~ enable)
+
+import macroid.FullDsl._
+runUi(action)</code></pre>
+
+          <section>
+            <h2>Protify</h2>
+
           </section>
         </section>
 
@@ -188,6 +279,18 @@
             <li class="fragment">UI can be developed in several ways</li>
             <li class="fragment">our favourite libraries works</li>
             <li class="fragment">Android SDK sucks</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Useful sources</h2>
+          <ul>
+            <li class="fragment">Scala-Android - <a href="http://scala-android.org">scala-android.org</a></li>
+            <li class="fragment">Scala on Android - <a href="http://scala-on-android.taig.io">scala-on-android.taig.io</a></li>
+            <li class="fragment">Android Documentation - <a href="https://developer.android.com/guide">developer.android.com/guide</a></li>
+            <li class="fragment">Scaloid - <a href="https://github.com/pocorall/scaloid">github.com/pocorall/scaloid</a></li>
+            <li class="fragment">Macroid - <a href="http://macroid.github.io/">macroid.github.io</a></li>
+            <li class="fragment">Protify - <a href="https://github.com/scala-android/sbt-android-protify">github.com/scala-android/sbt-android-protify</a></li>
           </ul>
         </section>
 
