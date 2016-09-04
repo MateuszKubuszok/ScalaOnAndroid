@@ -6,7 +6,7 @@
 
     <title>Scala on Android</title>
 
-    <meta name="description" content="Current state of art in using Scala for Android applications developement" />
+    <meta name="description" content="Current state of art in using Scala for Android applications development" />
     <meta name="author" content="Mateusz Kubuszok" />
 
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -47,7 +47,7 @@
           <h2>Agenda</h2>
           <ul>
             <li class="fragment">raw Scala and Android</li>
-            <li class="fragment">different flavours of UI developement</li>
+            <li class="fragment">different flavors of UI development</li>
             <li class="fragment">functional programming on Android</li>
           </ul>
         </section>
@@ -122,16 +122,16 @@ apply plugin: "jp.leafytree.android-scala"</code></pre>
             <pre class="fragment"><code class="hljs scala">addSbtPlugin("org.scala-android" % "sbt-android" % "1.6.15")</code></pre>
             <code class="fragment">build.sbt</code>
             <pre class="fragment"><code class="hljs scala">androidBuild
-            platformTarget := "android-21"</code></pre>
+platformTarget := "android-21"</code></pre>
           </section>
 
           <section>
             <h2>sbt-android</h2>
             <ul>
               <li class="fragment">existed since 2012</li>
-              <li class="fragment">supports Scala 2.10.5 and 2.11.7</li>
+              <li class="fragment">allows to use any Scala version (though 2.11.5 min would be best)</li>
               <li class="fragment">requires manual config of multidex and/or proguard</li>
-              <li class="fragment">last update 5 months ago</li>
+              <li class="fragment">last update few days ago</li>
             </ul>
           </section>
 
@@ -148,7 +148,7 @@ apply plugin: "jp.leafytree.android-scala"</code></pre>
 
         <section>
           <section>
-            <h1>Different flavours of UI developement</h1>
+            <h1>Different flavors of UI development</h1>
           </section>
 
           <section>
@@ -229,7 +229,7 @@ l[VerticalLinearLayout](
               <li class="fragment">maintained by 47deg</li>
               <li class="fragment">as little verbosity as with Scaloid</li>
               <li class="fragment">works with all Android components</li>
-              <li class="fragment">really nice support for async - UI actions as IO monad (unfortunatelly they don't work with for-comprehension)</li>
+              <li class="fragment">really nice support for async - UI actions as IO monad (unfortunately they don't work with for-comprehension)</li>
               <li class="fragment">thread safety (as opposed to vanilla Android SDK)</li>
               <li class="fragment">last update 3 months ago</li>
             </ul>
@@ -243,10 +243,12 @@ l[VerticalLinearLayout](
 
 import macroid.FullDsl._
 runUi(action)</code></pre>
+          </section>
 
           <section>
             <h2>Protify</h2>
-
+            <iframe width="560" height="315" src="https://www.youtube.com/embed/LJLLyua0bYA" frameborder="0" allowfullscreen></iframe>
+            <small>demo from Protify's page</small>
           </section>
         </section>
 
@@ -256,19 +258,43 @@ runUi(action)</code></pre>
           </section>
 
           <section>
-            <h2>Android SDK</h2>
-          </section>
-
-          <section>
-            <h2>Mutability and statefulness</h2>
+            <h2>Android</h2>
+            <ul>
+              <li class="fragment">stateful API</li>
+              <li class="fragment">allows and uses nulls</li>
+              <li class="fragment">imposes flow of data and way of handling actions</li>
+              <li class="fragment">many libraries use globals</li>
+            </ul>
           </section>
 
           <section>
             <h2>Slick</h2>
+            <ul>
+              <li class="fragment">version 2 works</li>
+              <li class="fragment">SQLite driver</li>
+              <li class="fragment">see: <a href="https://github.com/pulsation/slick-android-example">github.com/pulsation/slick-android-example</a></li>
+            </ul>
           </section>
 
           <section>
             <h2>Scalaz and Cats</h2>
+            <ul>
+              <li class="fragment">:)</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2>Mutability and statefulness</h2>
+            <p><img src="basic-lifecycle.png" alt="android lifecycle" /></p>
+            <small>from Android documentation</small>
+          </section>
+
+          <section>
+            <h2>Mutability and statefulness</h2>
+            <ul>
+              <li class="fragment">purely functional programming virtually impossible</li>
+              <li class="fragment">nothing prevent us from creating an abstraction layer</li>
+            </ul>
           </section>
         </section>
 
@@ -277,7 +303,7 @@ runUi(action)</code></pre>
           <ul>
             <li class="fragment">Scala is an option</li>
             <li class="fragment">UI can be developed in several ways</li>
-            <li class="fragment">our favourite libraries works</li>
+            <li class="fragment">our favorite libraries works</li>
             <li class="fragment">Android SDK sucks</li>
           </ul>
         </section>
